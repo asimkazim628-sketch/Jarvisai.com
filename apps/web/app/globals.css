@@ -1,8 +1,0 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-:root { color-scheme: dark; }
-body { margin: 0; background: #020617; color: white; }
-.glass { background: rgba(8, 20, 38, .72); border: 1px solid rgba(34, 211, 238, .22); backdrop-filter: blur(18px); }
-.neon-text { text-shadow: 0 0 20px rgba(34, 211, 238, .75); }
