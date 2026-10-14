@@ -1,0 +1,3 @@
+## 2026-10-14 - Interactive Chat & Voice Accessibility Controls
+**Learning:** In interactive dashboard components with async chat and Web Speech API integrations, missing element IDs on labels, absent focus rings (`focus-visible`), and lack of `aria-live` or `aria-pressed` states leave screen reader and keyboard-only users without visual/auditory feedback during state transitions.
+**Action:** Always link form inputs with explicit `htmlFor`/`id` pairs, add `role="log" aria-live="polite"` on message logs, include `focus-visible` ring styles on interactive custom buttons/inputs, and set dynamic `disabled` and `aria-pressed` attributes on async and toggle buttons.
