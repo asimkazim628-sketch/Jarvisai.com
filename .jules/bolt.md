@@ -1,0 +1,3 @@
+## 2026-10-15 - Slice Projection and Atomic Push in Mongoose Conversations
+**Learning:** Fetching full Mongoose documents containing array histories (e.g. chat messages) transfers $O(N)$ payloads over wire and deserializes unnecessary subdocuments into Node memory. Updating with `.save()` resends the full $O(N)$ array back to MongoDB. Using `{ messages: { $slice: -12 } }` projection with `.lean()` and updating via atomic `$push` reduces DB network traffic and serialization overhead from $O(N)$ to $O(1)$.
+**Action:** When working with growing document arrays in Mongoose, prefer projection slicing with `.lean()` for reads and `$push` for appends instead of loading and saving full documents.
