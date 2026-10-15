@@ -9,13 +9,55 @@ const websiteSchema = z.object({ requirement: z.string().min(10) });
 
 export async function chat(req: AuthRequest, res: Response) {
   const { message, conversationId } = chatSchema.parse(req.body);
-  const conversation = conversationId ? await Conversation.findOne({ _id: conversationId, userId: req.userId }) : await Conversation.create({ userId: req.userId, title: message.slice(0, 60) });
-  if (!conversation) return res.status(404).json({ message: 'Conversation not found.' });
-  conversation.messages.push({ role: 'user', content: message });
-  const recent = conversation.messages.slice(-12).map((m: { role: 'user' | 'assistant' | 'system'; content: string }) => ({ role: m.role, content: m.content }));
-  const answer = await askJarvis(recent);
-  conversation.messages.push({ role: 'assistant', content: answer });
-  await conversation.save();
+
+  if (conversationId) {
+    // Optimization: Retrieve only the last 12 messages using $slice and .lean()
+    // to reduce memory overhead and avoid fetching full conversation history over the wire.
+    const conversation = await Conversation.findOne(
+      { _id: conversationId, userId: req.userId },
+      { messages: { $slice: -12 } }
+    ).lean();
+
+    if (!conversation) return res.status(404).json({ message: 'Conversation not found.' });
+
+    const recent = [
+      ...(conversation.messages || []),
+      { role: 'user' as const, content: message }
+    ].map((m) => ({ role: m.role as 'user' | 'assistant' | 'system', content: m.content }));
+
+    const answer = await askJarvis(recent);
+
+    // Optimization: Atomically push new messages ($push) instead of re-saving full array
+    // Reduces network payload from O(N) to O(1) where N is total message count.
+    await Conversation.updateOne(
+      { _id: conversation._id },
+      {
+        $push: {
+          messages: {
+            $each: [
+              { role: 'user', content: message },
+              { role: 'assistant', content: answer }
+            ]
+          }
+        }
+      }
+    );
+
+    return res.json({ conversationId: conversation._id.toString(), answer });
+  }
+
+  // Handle new conversation creation: generate answer first, then perform a single DB create write
+  const answer = await askJarvis([{ role: 'user', content: message }]);
+
+  const conversation = await Conversation.create({
+    userId: req.userId,
+    title: message.slice(0, 60),
+    messages: [
+      { role: 'user', content: message },
+      { role: 'assistant', content: answer }
+    ]
+  });
+
   return res.json({ conversationId: conversation.id, answer });
 }
 
