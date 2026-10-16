@@ -9,14 +9,56 @@ const websiteSchema = z.object({ requirement: z.string().min(10) });
 
 export async function chat(req: AuthRequest, res: Response) {
   const { message, conversationId } = chatSchema.parse(req.body);
-  const conversation = conversationId ? await Conversation.findOne({ _id: conversationId, userId: req.userId }) : await Conversation.create({ userId: req.userId, title: message.slice(0, 60) });
-  if (!conversation) return res.status(404).json({ message: 'Conversation not found.' });
-  conversation.messages.push({ role: 'user', content: message });
-  const recent = conversation.messages.slice(-12).map((m: { role: 'user' | 'assistant' | 'system'; content: string }) => ({ role: m.role, content: m.content }));
+
+  let activeConversationId = conversationId;
+  let recentMessages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }> = [];
+
+  if (conversationId) {
+    // Optimization: Use MongoDB $slice projection to retrieve only the last 12 messages from DB
+    // instead of transferring the entire message history over network, and use .lean() to bypass
+    // Mongoose document hydration overhead.
+    const conversation = await Conversation.findOne(
+      { _id: conversationId, userId: req.userId },
+      { messages: { $slice: -12 } }
+    ).lean();
+
+    if (!conversation) return res.status(404).json({ message: 'Conversation not found.' });
+
+    activeConversationId = String(conversation._id);
+    recentMessages = (conversation.messages || []).map((m: { role: 'user' | 'assistant' | 'system'; content: string }) => ({
+      role: m.role,
+      content: m.content
+    }));
+  } else {
+    const newConv = await Conversation.create({
+      userId: req.userId,
+      title: message.slice(0, 60),
+      messages: []
+    });
+    activeConversationId = String(newConv._id);
+  }
+
+  // Include current user message in context window for AI service
+  const recent = [...recentMessages, { role: 'user' as const, content: message }];
   const answer = await askJarvis(recent);
-  conversation.messages.push({ role: 'assistant', content: answer });
-  await conversation.save();
-  return res.json({ conversationId: conversation.id, answer });
+
+  // Optimization: Atomically append user and assistant messages via $push + $each
+  // without downloading/saving the full array back to MongoDB.
+  await Conversation.updateOne(
+    { _id: activeConversationId, userId: req.userId },
+    {
+      $push: {
+        messages: {
+          $each: [
+            { role: 'user', content: message },
+            { role: 'assistant', content: answer }
+          ]
+        }
+      }
+    }
+  );
+
+  return res.json({ conversationId: activeConversationId, answer });
 }
 
 export async function websiteGenerator(req: AuthRequest, res: Response) {
