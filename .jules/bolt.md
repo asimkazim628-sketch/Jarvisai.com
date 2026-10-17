@@ -1,0 +1,3 @@
+## 2025-05-18 - Sliced MongoDB Projections and Atomic $Push for Chat History
+**Learning:** In LLM chat applications stored in MongoDB, fetching full `Conversation` documents and calling `.save()` scales as O(N) memory and DB payload size per turn as conversation length grows. Utilizing `$slice: -K` with `.lean()` for context retrieval and atomic `$push` with `$each` for updates reduces database network transfer and Node memory overhead to O(1).
+**Action:** Always project only the last K messages needed for LLM prompt context and push new messages directly using `$push` instead of full document re-hydration/re-saving.
