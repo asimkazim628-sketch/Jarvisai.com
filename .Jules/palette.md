@@ -1,0 +1,3 @@
+## 2025-02-18 - Chat Input & Async State Accessibility
+**Learning:** In interactive AI assistant command centers, dark-themed custom form controls often lack visible focus indicators and proper ARIA labels, making keyboard navigation difficult. Additionally, async chat submissions require disabled states and dynamic aria-labels (`Sending...`) to prevent duplicate requests and inform screen readers.
+**Action:** Always include `focus-visible:ring-2 focus-visible:ring-cyan-300`, `aria-label`, `disabled` state during async operations, and `role="log"` with `aria-live="polite"` on chat feed containers.
