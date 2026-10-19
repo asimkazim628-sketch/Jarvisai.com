@@ -1,0 +1,3 @@
+## 2025-02-19 - MongoDB Array Operations in Chat Conversations
+**Learning:** In chat applications storing full conversation message arrays in MongoDB documents, using `findOne` + `save()` creates O(N) payload overhead and full-document re-saves on every response turn. Using projection `{ messages: { $slice: -12 } }` along with `.lean()` for reading and atomic `$push` with `$each` for writing keeps database payload size and network serialization overhead at O(1) constant scale regardless of how long the chat history grows.
+**Action:** Always use `$slice` projection and atomic `$push` updates when interacting with growing array subdocuments like conversation history.
