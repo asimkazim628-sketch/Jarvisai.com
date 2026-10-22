@@ -1,0 +1,3 @@
+## 2025-05-18 - Interactive Elements Focus and Live Region Feedback
+**Learning:** In dark mode glassmorphism interfaces (like JARVIS dashboard), default outlines are often suppressed (`outline-none`). Missing visible focus rings (`focus-visible:ring-2`) hinders keyboard users, while interactive chat containers without `role="log"` and `aria-live="polite"` leave screen reader users unaware of async streaming or returned responses.
+**Action:** Always verify `focus-visible:ring-2` is present on custom-styled buttons/inputs, and add `role="log"` with `aria-live="polite"` on chat history containers.
