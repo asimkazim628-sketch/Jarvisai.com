@@ -9,14 +9,53 @@ const websiteSchema = z.object({ requirement: z.string().min(10) });
 
 export async function chat(req: AuthRequest, res: Response) {
   const { message, conversationId } = chatSchema.parse(req.body);
-  const conversation = conversationId ? await Conversation.findOne({ _id: conversationId, userId: req.userId }) : await Conversation.create({ userId: req.userId, title: message.slice(0, 60) });
-  if (!conversation) return res.status(404).json({ message: 'Conversation not found.' });
-  conversation.messages.push({ role: 'user', content: message });
-  const recent = conversation.messages.slice(-12).map((m: { role: 'user' | 'assistant' | 'system'; content: string }) => ({ role: m.role, content: m.content }));
-  const answer = await askJarvis(recent);
-  conversation.messages.push({ role: 'assistant', content: answer });
-  await conversation.save();
-  return res.json({ conversationId: conversation.id, answer });
+
+  if (conversationId) {
+    // Bolt Optimization: Lean query with MongoDB $slice projection to fetch only the last 12 messages.
+    // Avoids Mongoose document hydration overhead and transferring potentially thousands of messages over network (O(1) memory/bandwidth).
+    const conversation = await Conversation.findOne(
+      { _id: conversationId, userId: req.userId },
+      { messages: { $slice: -12 } }
+    ).lean();
+
+    if (!conversation) return res.status(404).json({ message: 'Conversation not found.' });
+
+    const recentHistory = (conversation.messages || []).map((m: { role: 'user' | 'assistant' | 'system'; content: string }) => ({
+      role: m.role,
+      content: m.content
+    }));
+    recentHistory.push({ role: 'user', content: message });
+
+    const answer = await askJarvis(recentHistory.slice(-12));
+
+    // Bolt Optimization: Atomic $push appends only the 2 new messages rather than rewriting the full messages array.
+    await Conversation.updateOne(
+      { _id: conversationId, userId: req.userId },
+      {
+        $push: {
+          messages: {
+            $each: [
+              { role: 'user', content: message },
+              { role: 'assistant', content: answer }
+            ]
+          }
+        }
+      }
+    );
+
+    return res.json({ conversationId, answer });
+  }
+
+  // Create new conversation with initial user message and JARVIS answer
+  const userMsg = { role: 'user' as const, content: message };
+  const answer = await askJarvis([userMsg]);
+  const newConversation = await Conversation.create({
+    userId: req.userId,
+    title: message.slice(0, 60),
+    messages: [userMsg, { role: 'assistant', content: answer }]
+  });
+
+  return res.json({ conversationId: newConversation.id, answer });
 }
 
 export async function websiteGenerator(req: AuthRequest, res: Response) {
