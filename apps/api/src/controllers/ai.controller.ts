@@ -9,14 +9,59 @@ const websiteSchema = z.object({ requirement: z.string().min(10) });
 
 export async function chat(req: AuthRequest, res: Response) {
   const { message, conversationId } = chatSchema.parse(req.body);
-  const conversation = conversationId ? await Conversation.findOne({ _id: conversationId, userId: req.userId }) : await Conversation.create({ userId: req.userId, title: message.slice(0, 60) });
-  if (!conversation) return res.status(404).json({ message: 'Conversation not found.' });
-  conversation.messages.push({ role: 'user', content: message });
-  const recent = conversation.messages.slice(-12).map((m: { role: 'user' | 'assistant' | 'system'; content: string }) => ({ role: m.role, content: m.content }));
-  const answer = await askJarvis(recent);
-  conversation.messages.push({ role: 'assistant', content: answer });
-  await conversation.save();
-  return res.json({ conversationId: conversation.id, answer });
+
+  if (conversationId) {
+    // Optimization: Query with $slice projection and .lean() to fetch only the last 10 messages for context.
+    // This avoids loading and hydrating full conversation histories into memory (O(N) -> O(1) memory & network overhead).
+    const conversation = await Conversation.findOne(
+      { _id: conversationId, userId: req.userId },
+      { messages: { $slice: -10 } }
+    ).lean();
+
+    if (!conversation) return res.status(404).json({ message: 'Conversation not found.' });
+
+    const recent = conversation.messages.map((m: { role: string; content: string }) => ({
+      role: m.role as 'user' | 'assistant' | 'system',
+      content: m.content
+    }));
+    recent.push({ role: 'user', content: message });
+
+    const answer = await askJarvis(recent);
+
+    // Optimization: Use atomic $push update to append new messages instead of re-serializing the entire messages array via .save()
+    await Conversation.updateOne(
+      { _id: conversation._id },
+      {
+        $push: {
+          messages: {
+            $each: [
+              { role: 'user', content: message },
+              { role: 'assistant', content: answer }
+            ]
+          }
+        }
+      }
+    );
+
+    return res.json({ conversationId: conversation._id.toString(), answer });
+  } else {
+    // New conversation creation
+    const conversation = await Conversation.create({
+      userId: req.userId,
+      title: message.slice(0, 60),
+      messages: [{ role: 'user', content: message }]
+    });
+
+    const answer = await askJarvis([{ role: 'user', content: message }]);
+
+    // Atomic $push append of assistant answer
+    await Conversation.updateOne(
+      { _id: conversation._id },
+      { $push: { messages: { role: 'assistant', content: answer } } }
+    );
+
+    return res.json({ conversationId: conversation.id, answer });
+  }
 }
 
 export async function websiteGenerator(req: AuthRequest, res: Response) {

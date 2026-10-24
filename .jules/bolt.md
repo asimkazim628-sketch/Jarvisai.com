@@ -1,0 +1,3 @@
+## 2025-03-30 - MongoDB Array Document Slicing and Atomic Push Optimization
+**Learning:** In chat applications using Mongoose, fetching full conversation documents with growing message history arrays and saving them via `.save()` creates O(N) network payload overhead and forces Mongoose to hydrate every subdocument. Using `$slice` projection with `.lean()` loads only the required context, and atomic `$push` (`$each`) appends new entries without re-serializing the full document.
+**Action:** Always use `$slice` projection + `.lean()` and atomic `$push` when appending to growing document arrays in Mongoose.
