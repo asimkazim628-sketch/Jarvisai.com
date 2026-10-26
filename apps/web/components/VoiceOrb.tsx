@@ -1,7 +1,15 @@
 'use client';
+
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 
-export function VoiceOrb({ listening }: { listening: boolean }) {
+/**
+ * VoiceOrb component renders a glowing neon orb with Framer Motion animations.
+ * ⚡ Performance optimization: Memoized with `React.memo` to prevent expensive
+ * Framer Motion re-evaluations and re-renders when parent state (such as typing
+ * chat messages or editing tokens) updates.
+ */
+export const VoiceOrb = memo(function VoiceOrb({ listening }: { listening: boolean }) {
   return (
     <motion.div animate={{ scale: listening ? [1, 1.08, 1] : 1 }} transition={{ repeat: Infinity, duration: 1.8 }} className="relative mx-auto h-44 w-44 rounded-full bg-cyan-400/10 shadow-neon">
       <div className="absolute inset-5 rounded-full border border-cyan-300/50" />
@@ -9,4 +17,4 @@ export function VoiceOrb({ listening }: { listening: boolean }) {
       <div className="absolute inset-0 grid place-items-center text-3xl font-bold text-cyan-200 neon-text">J</div>
     </motion.div>
   );
-}
+});
