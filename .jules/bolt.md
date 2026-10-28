@@ -1,0 +1,3 @@
+## 2025-05-18 - Efficient Mongoose Document Slicing and Atomic Updates for AI Conversations
+**Learning:** In chat applications storing full message histories in a Mongoose schema array, loading the entire conversation document to slice the last N messages in memory causes O(N) database transfer and memory allocation overhead. Calling `.save()` on the hydrated Mongoose document re-serializes and overwrites the entire message array on every turn.
+**Action:** Use MongoDB projection `{ messages: { $slice: -N } }` combined with `.lean()` to load only the required context window, and perform atomic `$push` updates via `updateOne()` to append new messages without transferring historical data.
