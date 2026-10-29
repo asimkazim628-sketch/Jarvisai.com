@@ -1,0 +1,3 @@
+## 2026-10-29 - Form Label Association and Interactive Feedback in Dark-Themed Dashboards
+**Learning:** Dense single-line React component files with custom styled glassmorphism inputs can lack basic accessibility attributes (`htmlFor`, `aria-label`, `focus-visible` outline rings) and async action feedback. Adding explicit loading states (`isSending`), button spinner feedback, `aria-live="polite"` region for chat outputs, and `focus-visible` focus rings dramatically enhances keyboard and screen-reader usability.
+**Action:** When updating dashboard control fields, always pair `<label htmlFor>` with form `<input id>`, add `aria-live` to dynamically updating message streams, and ensure focus visible states are explicitly defined with high-contrast ring colors.
