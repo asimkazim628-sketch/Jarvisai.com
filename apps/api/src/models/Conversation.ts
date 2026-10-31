@@ -12,4 +12,7 @@ const conversationSchema = new Schema({
   messages: { type: [messageSchema], default: [] }
 }, { timestamps: true });
 
+// Bolt Optimization: Compound index for querying a specific conversation owned by a user
+conversationSchema.index({ userId: 1, _id: 1 });
+
 export const Conversation = models.Conversation || model('Conversation', conversationSchema);
