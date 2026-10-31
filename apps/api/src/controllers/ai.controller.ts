@@ -9,13 +9,40 @@ const websiteSchema = z.object({ requirement: z.string().min(10) });
 
 export async function chat(req: AuthRequest, res: Response) {
   const { message, conversationId } = chatSchema.parse(req.body);
-  const conversation = conversationId ? await Conversation.findOne({ _id: conversationId, userId: req.userId }) : await Conversation.create({ userId: req.userId, title: message.slice(0, 60) });
+
+  // Bolt Optimization:
+  // 1. Fetch only the last 11 messages from MongoDB using `$slice: -11`.
+  //    Avoids transferring and deserializing unbounded conversation history into Node.js memory.
+  // 2. Append new user and assistant messages atomically via `$push` with `updateOne`,
+  //    bypassing heavy full-document serialization and write amplification with `.save()`.
+  const conversation = conversationId
+    ? await Conversation.findOne({ _id: conversationId, userId: req.userId }, { messages: { $slice: -11 } })
+    : await Conversation.create({ userId: req.userId, title: message.slice(0, 60) });
+
   if (!conversation) return res.status(404).json({ message: 'Conversation not found.' });
-  conversation.messages.push({ role: 'user', content: message });
-  const recent = conversation.messages.slice(-12).map((m: { role: 'user' | 'assistant' | 'system'; content: string }) => ({ role: m.role, content: m.content }));
+
+  const history = conversation.messages.map((m: { role: 'user' | 'assistant' | 'system'; content: string }) => ({
+    role: m.role,
+    content: m.content
+  }));
+  const recent = [...history, { role: 'user' as const, content: message }];
+
   const answer = await askJarvis(recent);
-  conversation.messages.push({ role: 'assistant', content: answer });
-  await conversation.save();
+
+  await Conversation.updateOne(
+    { _id: conversation._id },
+    {
+      $push: {
+        messages: {
+          $each: [
+            { role: 'user', content: message },
+            { role: 'assistant', content: answer }
+          ]
+        }
+      }
+    }
+  );
+
   return res.json({ conversationId: conversation.id, answer });
 }
 
