@@ -1,0 +1,3 @@
+## 2026-11-03 - Compound indexes with leading _id in MongoDB
+**Learning:** Adding a compound index whose leading field is `_id` (e.g. `{ _id: 1, userId: 1 }`) is an anti-pattern in MongoDB because `_id` is already uniquely indexed by default. The query planner will use the single-field `_id` index and filter remaining fields in-memory without scanning multiple docs, meaning the compound index adds RAM and write penalty without read benefit. For auth and model queries, prioritize lean projection (`.lean()`) and existence checks (`Model.exists()`) to bypass Mongoose document hydration.
+**Action:** Do not propose compound indexes starting with `_id`; use `.lean()` on read-only queries and `.exists()` for duplicate checks to optimize query overhead.
