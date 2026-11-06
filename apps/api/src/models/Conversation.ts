@@ -12,4 +12,12 @@ const conversationSchema = new Schema({
   messages: { type: [messageSchema], default: [] }
 }, { timestamps: true });
 
+/**
+ * Performance optimization:
+ * Compound index on { userId: 1, _id: 1 } supports the frequent query
+ * in chat controller: `Conversation.findOne({ _id: conversationId, userId: req.userId })`.
+ * This enables direct index seeks without index intersection or unindexed filtering.
+ */
+conversationSchema.index({ userId: 1, _id: 1 });
+
 export const Conversation = models.Conversation || model('Conversation', conversationSchema);
