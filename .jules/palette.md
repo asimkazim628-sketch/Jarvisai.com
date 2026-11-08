@@ -1,0 +1,3 @@
+## 2026-11-08 - Async Chat Loading State & Live Feed Accessibility
+**Learning:** Chat interfaces with async API responses leave users wondering if their message was sent when no loading indicator or disabled states are present, leading to accidental duplicate requests. Adding an explicit live region (`role="log"` with `aria-live="polite"` and an accessible label) allows screen readers to announce new assistant responses seamlessly while the user observes the in-flight status.
+**Action:** When creating conversational or message feed components, always couple `isSending` state to disable input/submit elements, provide an animated thinking bubble in the feed, and structure the feed container with `role="log"` and `aria-live="polite"`.
