@@ -11,7 +11,8 @@ const tokenFor = (id: string) => jwt.sign({ sub: id }, env.JWT_SECRET, { expires
 
 export async function signup(req: Request, res: Response) {
   const body = signupSchema.parse(req.body);
-  const exists = await User.findOne({ email: body.email });
+  // Optimization: use .lean() to skip Mongoose document hydration for existence checks
+  const exists = await User.findOne({ email: body.email }).lean();
   if (exists) return res.status(409).json({ message: 'Email already registered.' });
   const user = await User.create({ ...body, passwordHash: await bcrypt.hash(body.password, 12) });
   return res.status(201).json({ token: tokenFor(user.id), user: { id: user.id, name: user.name, email: user.email, preferredLanguage: user.preferredLanguage } });
@@ -19,7 +20,9 @@ export async function signup(req: Request, res: Response) {
 
 export async function login(req: Request, res: Response) {
   const body = loginSchema.parse(req.body);
-  const user = await User.findOne({ email: body.email });
+  // Optimization: use .lean() to return a plain JavaScript object, reducing memory allocation & CPU overhead
+  const user = await User.findOne({ email: body.email }).lean();
   if (!user || !(await bcrypt.compare(body.password, user.passwordHash))) return res.status(401).json({ message: 'Invalid credentials.' });
-  return res.json({ token: tokenFor(user.id), user: { id: user.id, name: user.name, email: user.email, preferredLanguage: user.preferredLanguage } });
+  const userId = String(user._id);
+  return res.json({ token: tokenFor(userId), user: { id: userId, name: user.name, email: user.email, preferredLanguage: user.preferredLanguage } });
 }
